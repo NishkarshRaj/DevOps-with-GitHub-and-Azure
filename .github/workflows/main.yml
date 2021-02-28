@@ -1,5 +1,5 @@
 name: Deploy React Applications to AKS using GitHub Actions
-on:
+#on: # Disabling actions. To enable, remove comment
   push
   
 jobs:

@@ -2,6 +2,8 @@
 
 ![](img/poster.png)
 
+[YouTube Demonstration](https://www.youtube.com/watch?v=73tq15DVeSE&feature=youtu.be)
+
 ### Create a repository and add secrets
 
 #### Generate Microsoft Azure Secret
