@@ -1,70 +1,171 @@
-# Getting Started with Create React App
+## Hosting React Applications on Microsoft Azure with GitHub Actions
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+![](img/poster.png)
 
-## Available Scripts
+### Create a repository and add secrets
 
-In the project directory, you can run:
+#### Generate Microsoft Azure Secret
 
-### `npm start`
+* Generate Secret
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```
+az account list
+az ad sp create-for-rbac --name "myApp" --role contributor --scopes /subscriptions/<"">/resourceGroups/<""> --sdk-auth
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+* Store Secret
 
-### `npm test`
+```
+{
+  "clientId": "",
+  "clientSecret": "",
+  "subscriptionId": "",
+  "tenantId": "",
+  "activeDirectoryEndpointUrl": "",
+  "resourceManagerEndpointUrl": "",
+  "activeDirectoryGraphResourceId": "",
+  "sqlManagementEndpointUrl": "",
+  "galleryEndpointUrl": "",
+  "managementEndpointUrl": ""
+}
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Create a React Application
 
-### `npm run build`
+```
+$ npx create-react-app demo
+$ cd demo
+$ npm run start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Push the React Application on GitHub
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```
+$ git remote add origin "<URL>"
+$ git add .
+$ git commit -m "<Commit Message>"
+$ git push -u origin master
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Dockerize the React Application
 
-### `npm run eject`
+```Dockerfile
+FROM    node:10-alpine 
+WORKDIR /usr/src/app
+COPY    . .
+RUN     npm install
+RUN     npm run build
+EXPOSE  3000
+CMD     [ "npm", "start" ]
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+### Setup GitHub Actions for Docker Build and Push
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```yaml
+name: Deploy React Applications to AKS using GitHub Actions
+on:
+  push
+  
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+      - name: Create Docker Image for Development Environment
+        run: docker build -t [username/repo] .
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.username }}
+          password: ${{ secrets.password }}
+        
+      - name: Docker Push
+        run: docker push [username/repo]
+```
 
-## Learn More
+https://labs.play-with-docker.com/#
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Create a Kubernetes Service on Azure
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+* Setup an Ingress and Map to FQDN
 
-### Code Splitting
+```
+helm repo add stable https://charts.helm.sh/stable --force-update
+helm install ingress stable/nginx-ingress
+kubectl get service
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+#### Writing Kubernetes Deployment and Service
 
-### Analyzing the Bundle Size
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        app: demo
+    spec:
+      containers:
+      - name: testaks
+        image: [username/repo]
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+spec:
+  type: NodePort
+  ports:
+  - port: 3000
+  selector:
+    app: demo
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+#### Writing Kubernetes Ingress
 
-### Making a Progressive Web App
+```yaml
+apiVersion : extensions/v1beta1
+kind : Ingress
+metadata :
+  name : demo
+  annotations :
+    kubernetes.io/ingress.class : nginx
+    nginx.ingress.kubernetes.io/rewrite-target : /
+spec :
+  rules :
+  - host : <URL> 
+    http :
+      paths :
+      - path : /
+        backend :
+          serviceName : demo
+          servicePort : 3000
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Setting up GitHub Actions to Deploy React Docker Image on AKS
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```yaml
+      - uses: azure/aks-set-context@v1
+        with:
+          creds: '${{ secrets.AZURE }}'
+          cluster-name: sib
+          resource-group: jioexchange
+        
+      - uses: azure/k8s-deploy@v1
+        with:
+          manifests: |
+            k8s.yaml
+            ingress.yaml
+          namespace: default
+```
