@@ -161,8 +161,8 @@ spec :
       - uses: azure/aks-set-context@v1
         with:
           creds: '${{ secrets.AZURE }}'
-          cluster-name: sib
-          resource-group: jioexchange
+          cluster-name: [K8s Cluster name]
+          resource-group: [name of Resource Group]
         
       - uses: azure/k8s-deploy@v1
         with:
