@@ -19,3 +19,16 @@ jobs:
         
       - name: Docker Push
         run: docker push nishkarshraj/demoaks
+      
+      - uses: azure/aks-set-context@v1
+        with:
+          creds: '${{ secrets.AZURE }}'
+          cluster-name: nishkarshraj
+          resource-group: nish
+        
+      - uses: azure/k8s-deploy@v1
+        with:
+          manifests: |
+            k8s.yaml
+            ingress.yaml
+          namespace: default
