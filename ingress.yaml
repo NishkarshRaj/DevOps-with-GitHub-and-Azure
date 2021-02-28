@@ -7,7 +7,7 @@ metadata :
     nginx.ingress.kubernetes.io/rewrite-target : /
 spec :
   rules :
-  - host : sib.centralindia.cloudapp.azure.com/ 
+  - host : sib.centralindia.cloudapp.azure.com
     http :
       paths :
       - path : /
